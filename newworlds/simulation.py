@@ -4,7 +4,7 @@ from __future__ import annotations
 import numpy as np
 
 from .creatures import GENE_NAMES, Population
-from .species import SpeciesTracker
+from .species import SpeciesTracker, gene_mean
 from .world import World
 
 HISTORY_EVERY = 10
@@ -50,11 +50,23 @@ class Simulation:
             g[:, 5] %= 1.0
             n = per if FOUNDERS[k][0] != "hunter" else per // 5
             g = g[:n]
-            sp = self.tracker.new_species(g.mean(0), 0, reference=ref)
+            sp = self.tracker.new_species(gene_mean(g), 0, reference=ref)
             x = np.clip(self.rng.normal(cx * w, w * 0.08, n), 0, w - 1e-3)
             y = np.clip(self.rng.normal(cy * h, h * 0.08, n), 0, h - 1e-3)
             self.pop.add(x, y, g, species=np.full(n, sp.id))
+        self.apply_signal_hues()
         self.tracker.refresh(self.pop.genes, self.pop.species, 0)
+
+    def apply_signal_hues(self) -> None:
+        """Members of a newly detected species adopt its signal colour (hue gene).
+
+        Hue has no effect on fitness; it acts like a mating signal that diverges
+        when lineages split, so new species become visible on the map.
+        """
+        for sid, hue in self.tracker.recolor:
+            m = self.pop.species == sid
+            self.pop.genes[m, 5] = (hue + self.rng.normal(0, 0.01, int(m.sum()))) % 1.0
+        self.tracker.recolor.clear()
 
     def _record(self) -> None:
         self.history_t.append(self.t)
@@ -73,6 +85,7 @@ class Simulation:
         self.pop.step(self.world)
         if self.t % self.tracker.interval == 0:
             self.pop.species = self.tracker.update(self.pop.genes, self.pop.species, self.t)
+            self.apply_signal_hues()
         elif self.t % HISTORY_EVERY == 0:
             self.tracker.refresh(self.pop.genes, self.pop.species, self.t)
         if self.t % HISTORY_EVERY == 0:
@@ -111,5 +124,5 @@ class Simulation:
     def mean_genes(self) -> dict[str, float]:
         if len(self.pop) == 0:
             return {g: 0.0 for g in GENE_NAMES}
-        m = self.pop.genes.mean(0)
+        m = gene_mean(self.pop.genes)
         return dict(zip(GENE_NAMES, m.tolist()))

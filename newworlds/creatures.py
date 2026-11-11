@@ -35,6 +35,7 @@ PREY_BODY_ENERGY = 4.5  # extra energy per unit of prey body size
 CATCH_BASE = 0.2       # chance per step a predator in range lands a kill
 CATCH_AGGR = 0.5
 INTERFERENCE = 0.5
+OUTRUN_MIN = 0.2        # catch-chance floor when the prey is much faster
 
 
 def body_size(size_gene):
@@ -266,7 +267,7 @@ class Population:
         # interference: hunters crowding the same patch get in each other's way
         rivals = (valid & (aggr[ci] > 0.5)).sum(1)
         # fast prey can outrun slow hunters
-        outrun = np.clip(speed / np.maximum(speed[prey_idx], 1e-3), 0.2, 1.0)
+        outrun = np.clip(speed / np.maximum(speed[prey_idx], 1e-3), OUTRUN_MIN, 1.0)
         p_catch = (CATCH_BASE + CATCH_AGGR * aggr) * outrun / (1.0 + INTERFERENCE * rivals)
         catch &= rng.random(n) < p_catch
         dead = np.zeros(n, dtype=bool)

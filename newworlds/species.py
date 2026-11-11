@@ -33,6 +33,14 @@ def features(genes: np.ndarray) -> np.ndarray:
                             HUE_WEIGHT * np.cos(ang), HUE_WEIGHT * np.sin(ang)])
 
 
+def gene_mean(genes: np.ndarray) -> np.ndarray:
+    """Mean gene vector, with a circular mean for hue (0.98 and 0.02 average to 0.0)."""
+    m = genes.mean(0)
+    ang = genes[:, HUE] * 2 * np.pi
+    m[HUE] = (np.arctan2(np.sin(ang).mean(), np.cos(ang).mean()) / (2 * np.pi)) % 1.0
+    return m
+
+
 def kmeans(X: np.ndarray, k: int, rng: np.random.Generator, iters: int = 15):
     """Plain k-means with k-means++ init. Returns (labels, centroids)."""
     n = len(X)
@@ -111,6 +119,7 @@ class Species:
     count: int = 0
     peak: int = 0
     fate: str = ""
+    hue: float = 0.0
 
     @property
     def alive(self) -> bool:
@@ -129,19 +138,24 @@ class SpeciesTracker:
         self.species: dict[int, Species] = {}
         self.next_id = 1
         self.events: list[tuple[int, str]] = []    # (time, message)
+        # new species whose members should adopt the species' signal hue
+        self.recolor: list[tuple[int, float]] = []
 
     # ------------------------------------------------------------------
     def living(self) -> list[Species]:
         return [s for s in self.species.values() if s.alive]
 
-    def _pick_color(self, hue: float) -> tuple:
-        used = [colorsys.rgb_to_hsv(*(c / 255 for c in s.color))[0] for s in self.living()]
-        h = hue
-        for _ in range(12):
-            if all(min(abs(h - u), 1 - abs(h - u)) > 0.06 for u in used):
-                break
-            h = (h + 0.083) % 1.0
-        return hue_color(h)
+    def _pick_hue(self, hue: float, min_gap: float = 0.07) -> float:
+        """A hue near `hue` that is visibly different from all living species."""
+        used = [s.hue for s in self.living()]
+
+        def gap(h):
+            return min([min(abs(h - u), 1 - abs(h - u)) for u in used] + [1.0])
+
+        if gap(hue) > min_gap:
+            return hue % 1.0
+        cands = (hue + np.linspace(0.08, 0.92, 22)) % 1.0
+        return float(cands[np.argmax([gap(c) for c in cands])])
 
     def new_species(self, centroid: np.ndarray, t: int, parent: int | None = None,
                     reference: np.ndarray | None = None) -> Species:
@@ -159,9 +173,11 @@ class SpeciesTracker:
         while name in taken:
             name = f"{genus} {ep} {_roman(k)}"
             k += 1
-        sp = Species(sid, name, genus, self._pick_color(centroid[HUE]), parent, t,
-                     centroid=centroid.copy())
+        hue = self._pick_hue(centroid[HUE])
+        sp = Species(sid, name, genus, hue_color(hue), parent, t,
+                     centroid=centroid.copy(), hue=hue)
         self.species[sid] = sp
+        self.recolor.append((sid, hue))
         if parent is None:
             self.events.append((t, f"{name} founded"))
         else:
@@ -190,7 +206,7 @@ class SpeciesTracker:
         if (~known).any():
             orphans = np.nonzero(~known)[0]
             if not self.living():
-                sp = self.new_species(genes[orphans].mean(0), t, reference=ref)
+                sp = self.new_species(gene_mean(genes[orphans]), t, reference=ref)
             labels[orphans] = self.living()[0].id
 
         # 1. try to split each species in two
@@ -206,8 +222,8 @@ class SpeciesTracker:
                 continue
             small = int(np.argmin(sizes))
             child_idx = idx[sub == small]
-            child = self.new_species(genes[child_idx].mean(0), t, parent=sp.id,
-                                     reference=genes[idx[sub != small]].mean(0))
+            child = self.new_species(gene_mean(genes[child_idx]), t, parent=sp.id,
+                                     reference=gene_mean(genes[idx[sub != small]]))
             labels[child_idx] = child.id
 
         # 2. one Lloyd step: everyone joins the nearest living centroid
@@ -256,7 +272,7 @@ class SpeciesTracker:
             else:
                 sp.peak = max(sp.peak, sp.count)
                 if t % self.interval == 0:
-                    sp.centroid = genes[m].mean(0)
+                    sp.centroid = gene_mean(genes[m])
 
 
 def _roman(n: int) -> str:
