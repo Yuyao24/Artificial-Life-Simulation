@@ -126,7 +126,7 @@ class Species:
         return self.extinct is None
 
 
-def hue_color(h: float, s: float = 0.75, v: float = 0.95) -> tuple:
+def hue_color(h: float, s: float = 0.62, v: float = 1.0) -> tuple:
     r, g, b = colorsys.hsv_to_rgb(h % 1.0, s, v)
     return int(r * 255), int(g * 255), int(b * 255)
 
