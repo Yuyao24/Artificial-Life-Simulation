@@ -18,7 +18,7 @@ of every species that ever lived.
 pip install -r requirements.txt
 python main.py                 # random world
 python main.py --seed 42       # reproducible world
-python main.py --cell 6        # smaller window for small screens (default 8 px per cell)
+python main.py --fullscreen   # start fullscreen (F11 toggles at any time)
 python main.py --headless --steps 5000 --seed 42   # no window: simulate, print, save report
 pytest                         # tests
 ```
@@ -35,10 +35,15 @@ pytest                         # tests
 | Left click / drag | drop food |
 | `V` | colour creatures by gene hue or by detected species |
 | `R` | reset with a new random seed |
+| `F11` | toggle fullscreen |
 | `P` | save a PNG report now (also saved automatically on exit) |
 | `Esc` / `Q` | quit |
 
 Reports go to `reports/`. Predators are drawn with a white ring.
+
+The window always renders at **1920×1080** and is scaled to fit your screen, with black bars
+if the aspect ratio doesn't match. Fonts (Inter, JetBrains Mono) are bundled under
+`newworlds/assets/fonts` with their licences.
 
 ## How it works
 
@@ -61,7 +66,7 @@ Reports go to `reports/`. Predators are drawn with a white ring.
   generated: a genus plus a Latin epithet taken from the species' most distinctive trait
   (*velox*, *magnus*, *ferox*, …).
 - **Rendering** (`newworlds/render.py`) is separate from the simulation, so it runs headless for tests
-  and `--headless` runs. About 6 ms per frame for drawing and 3–5 ms per simulation step with
-  1000–1500 creatures, which gives 35–60 FPS.
+  and `--headless` runs. About 10 ms per frame for drawing at 1080p and 3–5 ms per simulation step with
+  1000–1500 creatures, which gives 40–55 FPS at the default speed.
 - **Report** (`newworlds/report.py`): a matplotlib stacked population chart with temperature and event
   markers, and a networkx phylogenetic tree (bar width = peak population, † = extinct).

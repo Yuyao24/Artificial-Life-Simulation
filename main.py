@@ -18,7 +18,7 @@ from newworlds.simulation import Simulation
 def parse_args(argv=None):
     ap = argparse.ArgumentParser(description="New Worlds artificial-life simulation")
     ap.add_argument("--seed", type=int, default=None, help="random seed for a reproducible run")
-    ap.add_argument("--cell", type=int, default=8, help="pixels per cell (default 8)")
+    ap.add_argument("--fullscreen", action="store_true", help="start fullscreen (F11 toggles)")
     ap.add_argument("--speed", type=int, default=2, help="initial speed level index (0-6)")
     ap.add_argument("--headless", action="store_true", help="run without a window")
     ap.add_argument("--steps", type=int, default=3000, help="steps for --headless")
@@ -52,8 +52,8 @@ def run_interactive(args) -> None:
     from newworlds.render import SPEEDS, Renderer
 
     sim = Simulation(seed=args.seed)
-    ren = Renderer(sim, cell=args.cell)
-    ren.show_banner(f"NEW WORLD  #{sim.seed}", (120, 220, 170))
+    ren = Renderer(sim, fullscreen=args.fullscreen)
+    ren.show_banner(f"New world  ·  seed {sim.seed}", (110, 231, 183))
     clock = pygame.time.Clock()
     speed_i = max(0, min(args.speed, len(SPEEDS) - 1))
     paused = False
@@ -84,20 +84,22 @@ def run_interactive(args) -> None:
                     speed_i = max(speed_i - 1, 0)
                 elif k == pygame.K_c:
                     sim.ice_age()
-                    ren.show_banner("ICE AGE", (160, 210, 255))
+                    ren.show_banner("Ice age", (147, 197, 253))
                     ren.add_effect("ice", 0, 0, duration=2.5)
                 elif k == pygame.K_h:
                     sim.heatwave()
-                    ren.show_banner("HEATWAVE", (255, 150, 60))
+                    ren.show_banner("Heatwave", (255, 160, 90))
                     ren.add_effect("heat", 0, 0, duration=2.5)
                 elif k == pygame.K_m:
                     mx, my = pygame.mouse.get_pos()
-                    if mx < ren.world_w and my < ren.world_h and pygame.mouse.get_focused():
+                    if ren.in_world(mx, my) and pygame.mouse.get_focused():
                         x, y, r, killed = sim.meteor(*ren.to_world(mx, my))
                     else:
                         x, y, r, killed = sim.meteor()
                     ren.add_effect("meteor", x, y, r, duration=1.6)
-                    ren.show_banner(f"METEOR!  {killed} lost", (255, 180, 80))
+                    ren.show_banner(f"Meteor strike  ·  {killed} lost", (255, 190, 120))
+                elif k == pygame.K_F11:
+                    pygame.display.toggle_fullscreen()
                 elif k == pygame.K_v:
                     ren.color_by_species = not ren.color_by_species
                 elif k == pygame.K_r:
@@ -112,7 +114,7 @@ def run_interactive(args) -> None:
 
         if mouse_down:
             mx, my = pygame.mouse.get_pos()
-            if mx < ren.world_w and my < ren.world_h:
+            if ren.in_world(mx, my):
                 wx, wy = ren.to_world(mx, my)
                 sim.drop_food(wx, wy)
                 if frames % 6 == 0:
